@@ -6,7 +6,7 @@
 
 #include <Stepper.h>
 #include <Servo.h>
-
+//#include <digitalWriteFast.h>
 
 /*
    Initialize variables, pins
@@ -34,17 +34,23 @@ int tempInit;
 #define sonarPin A1
 int sonarPast = 0;
 int sonarDist;
+int arraySize = 5;
+int reading[255]; 
+
+
 
 //***** Servo motor *****
 #define servoPin 10
 int pos = 0;
 int temp = 0;
+int servoPos;
 Servo servo;  // create servo object to control a servo
 
 //***** Stepper motor *****
 #define stepPin 8
 #define dirPin 9
 #define stepper_mode 1
+#define stepper_EN 12
 // mode 0: continuous rotation in one direction, with speed controlled by analogread
 // mode 1: position control, input same as mode 0
 const int stepsPerRev = 800; // (360 degrees/1.8stepangle)*4 (why 4? not sure. microstepping?)
@@ -60,11 +66,11 @@ Stepper stepper(stepsPerRev, stepPin, dirPin);
 int dcEncoder0Pos = 0;
 int dcEncoder0PinALast = LOW;
 int dcN = LOW;
-const int dcP = 1.0;
-const int dcD = 0.1;
-int dcPast = 0;
-int dcDegree;
-int dcRevCount;
+const double dcP = 1.0;
+const double dcD = 0.1;
+double dcPast = 0;
+double dcDegree;
+double dcRevCount;
 
 
 
@@ -87,9 +93,11 @@ void setup() {
   pinMode (dcEncoder0PinA, INPUT);
   pinMode (dcEncoder0PinB, INPUT);
   pinMode(button, INPUT_PULLUP);
+  pinMode(stepper_EN, OUTPUT);
   attachInterrupt(digitalPinToInterrupt(button), buttonPress, RISING);
-  Serial.begin(9600);
+  Serial.begin(250000);
   servo.attach(servoPin);
+  digitalWrite(stepper_EN, 1); //disable the stepper until needed
   potPast = analogRead(potPin);
   tempInit = analogRead(tempPin);
 }
@@ -100,8 +108,8 @@ void buttonPress() {
   bounce = check_bounce(); //debouncing
   if (!bounce) {
     motorUsing = ((motorUsing + 1) % numMotors) % 32767;
-    //Serial.print("State change to ");
-    //Serial.println(motorUsing);
+    Serial.print("State change to ");
+    Serial.println(motorUsing);
   }
 }
 bool check_bounce()  // For button
@@ -123,6 +131,8 @@ int potRead() {
   int potValue = alpha * analogRead(potPin) + (1 - alpha) * potPast; // low pass filter
   potPast = potValue;
   float angle = (float)potValue / 1023 * 360; //[degrees]
+//  Serial.print(potValue);
+//  Serial.print('\t');
   return potValue;
 }
 
@@ -146,31 +156,61 @@ int tempRead() {
 
 //***** Read ultrasonic rangefinder *****
 int sonarRead() {     
-  int sonarValue = analogRead(sonarPin); //[inches]
-  if (abs(sonarValue - sonarPast) < 50)
-    sonarDist = (sonarValue) / 2;
-  else 
-    sonarDist = sonarDist;
-  return sonarValue;
+//  int sonarValue = analogRead(sonarPin); //[inches]
+////  if (abs(sonarValue - sonarPast) < 5) {
+//    sonarDist = (sonarValue) / 2;
+////  }
+////  else { 
+////    sonarDist = sonarDist;
+////  }
+//  Serial.println(sonarDist);
+
+  for(int i = 0; i < arraySize; i++)
+  {                                                    //array pointers go from 0 to 4
+
+    reading[i] = analogRead(sonarPin)/2;
+
+    delay(50);  //wait between analog samples
+   } 
+//  sort the values in the array by ascending order
+    for (int i=0; i< arraySize-1; i++){
+      for (int j=i+1; j< arraySize; j++){
+        if (reading[i] > reading[j]){
+          int w = reading[i];
+          reading[i] = reading[j];
+          reading[j] =w;
+        }
+      }
+     }
+
+
+   // now show the median range   
+   int midpoint = arraySize/2;    //midpoint of the array is the medain value in a sorted array
+   sonarDist = reading[midpoint];
+   
+  Serial.println(sonarDist); 
+  return sonarDist;
 }
 
 //***** Move servo *****
 void servoControl(int motorInput) {       
   digitalWrite(dcMotorEnable, LOW);
-  analogWrite(dcMotorPin1, 0);
-  analogWrite(dcMotorPin2, 0);
+//  analogWrite(dcMotorPin1, 0);
+//  analogWrite(dcMotorPin2, 0);
 
-  int servoPos = map(motorInput, 0, 1023, 0, 180);
+  servoPos = map(motorInput, 0, 1023, 0, 180);
+  Serial.println(servoPos);
   servo.write(servoPos);
-  delay(150);
+//  servo.writeMicroseconds(servoPos);
+//  delay(150);
 }
 
 //***** Move stepper *****
 void stepperControl(int motorInput) {
   digitalWrite(dcMotorEnable, LOW);
-  analogWrite(dcMotorPin1, 0);
-  analogWrite(dcMotorPin2, 0);
-
+//  analogWrite(dcMotorPin1, 0);
+//  analogWrite(dcMotorPin2, 0);
+  
   // mode 0: continuous rotation
   if (stepper_mode == 0) {
     int motorSpeed = map(motorInput, 0, 1023, 0, 100);
@@ -187,7 +227,10 @@ void stepperControl(int motorInput) {
     int stepsDesired = posDesired - stepCount;
     stepCount = stepCount + stepsDesired;
     stepper.setSpeed(30);
+//    Serial.println(stepsDesired);
+    if (abs(stepsDesired) > 5) {
     stepper.step(-stepsDesired);
+    }
     delay(50);
   }
 }
@@ -203,10 +246,12 @@ void dcEncoderRead() {
     dcRevCount = dcEncoder0Pos / 180;
     //dcDegree = abs((dcEncoder0Pos)%180);
     dcDegree = abs((dcEncoder0Pos * 2) % 360);
-    //Serial.print(dcEncoder0Pos);
-    //Serial.print(' ');
-    //Serial.println(dcDegree);
+//    Serial.print(dcEncoder0Pos);
+//    Serial.print(' ');
+    
   }
+  Serial.print(dcDegree);
+  Serial.print('\t');
   dcEncoder0PinALast = dcN;
 }
 
@@ -215,12 +260,28 @@ void dcPosControl(int motorInput) {
   digitalWrite(dcMotorEnable, HIGH);
   dcEncoderRead();
   
-  int dcPosDes = map(motorInput, 0, 1023, 0, 180);
+  int dcPosDes = map(motorInput, 0, 1023, 0, 360);
 
-  int dcSpeed = ((dcPosDes - dcDegree) * dcP + (dcDegree - dcPast) * dcD) * 255 / 360;
-  analogWrite(dcMotorPin1, 127 - dcSpeed);
-  analogWrite(dcMotorPin2, 127 + dcSpeed);
+//  Serial.print(dcPosDes);
+//  Serial.print('\t');
+
+  double dcSpeed = ((dcPosDes - dcDegree) * dcP + (dcDegree - dcPast) * dcD) * 127.0 / 360.0;
+  Serial.println(dcSpeed); //only starts moving <102 and >152
+  dcSpeed = int(dcSpeed);
+  if ((dcSpeed > -5) && (dcSpeed < 5)) {
+    dcSpeed = 0;
+  }  
+  else if ((dcSpeed < 0) && (dcSpeed > -25)) {
+    dcSpeed = -25;
+  }
+  else if ((dcSpeed > 0) && (dcSpeed < 25)) {
+    dcSpeed = 25;
+  }
+
+  analogWrite(dcMotorPin1, 127 + dcSpeed);
+  analogWrite(dcMotorPin2, 127 - dcSpeed);
   dcPast = dcDegree;
+//  delay(50);
 }
 
 //***** DC Motor Velocity Control *****//
@@ -229,8 +290,20 @@ void dcVelControl(int motorInput) {
   dcEncoderRead();
   
   int dcSpeed = map(motorInput, 0, 1023, 0, 255);
+  dcSpeed = int(dcSpeed);
+  if ((dcSpeed < 132) && (dcSpeed > 122)) {
+    dcSpeed = 127;
+  }
+  else if ((dcSpeed < 127) && (dcSpeed > 102)) {
+    dcSpeed = 102;
+  }
+  else if ((dcSpeed > 127) && (dcSpeed < 152)) {
+    dcSpeed = 152;
+  }
+
   analogWrite(dcMotorPin1, dcSpeed);
   analogWrite(dcMotorPin2, 255 - dcSpeed);
+  Serial.println(dcSpeed);
 }
 
 void loop() {
@@ -261,7 +334,8 @@ void loop() {
       motorInput = irRead();
       break;
     case 2:
-      motorInput = sonarRead();
+      motorInput = map(sonarRead(),6,150,0,1023);
+      
       break;
     case 3:
       motorInput = tempRead();
@@ -271,26 +345,31 @@ void loop() {
       break;
   }
 
-  motorInput = alpha * motorInput + (1 - alpha) * motorInputPast;
-  motorInputPast = motorInput;
+//  motorInput = alpha * motorInput + (1 - alpha) * motorInputPast;
+//  motorInputPast = motorInput;
 
-  Serial.println(motorInput);
+//  Serial.println(motorInput);
 
   switch(motorUsing) {
+    
     case 0:
+      digitalWrite(stepper_EN, 1);
       servoControl(motorInput);
       break;
     case 1:
       stepperControl(motorInput);
+      digitalWrite(stepper_EN, 0); //Enable stepper
       break;
     case 2:
+      digitalWrite(stepper_EN, 1);
       dcPosControl(motorInput);
       break;
     case 3:
+      digitalWrite(stepper_EN, 1);
       dcVelControl(motorInput);
       break;
     default:
-    Serial.println("Invalid input!");
+      Serial.println("Invalid input!");
   }
   
 
