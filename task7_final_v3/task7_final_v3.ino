@@ -115,7 +115,7 @@ void setup() {
   pinMode(button, INPUT_PULLUP);
   pinMode(stepper_EN, OUTPUT);
 //  attachInterrupt(digitalPinToInterrupt(button), buttonPress, RISING);
-  Serial.begin(9600);
+  Serial.begin(57600);
   servo.attach(servoPin);
   digitalWrite(stepper_EN, 1); //disable the stepper until needed
   potPast = analogRead(potPin);
@@ -151,7 +151,9 @@ int potRead() {
   int potValue = alpha * analogRead(potPin) + (1 - alpha) * potPast; // low pass filter
   potPast = potValue;
   float angle = (float)potValue / 1023 * 360; //[degrees]
-  Serial.println(potValue);
+  delay(20);
+  Serial.print(potValue);
+  Serial.println();
 //  Serial.print('\t');
   return potValue;
 }
@@ -268,7 +270,7 @@ void stepperControl(int motorInput) {
     if (abs(stepsDesired) > 5) {
     stepper.step(-stepsDesired);
     }
-    delay(50);
+//    delay(50);
   }
 }
 
@@ -290,9 +292,9 @@ void dcPosControl(int motorInput) {
   dcEncoderRead();
   
   int dcPosDes = map(motorInput, 0, 1023, 0, 360);
-  Serial.print("dcPositionDesired ");
-  Serial.print(dcPosDes);
-  Serial.print('\t');
+//  Serial.print("dcPositionDesired ");
+//  Serial.print(dcPosDes);
+//  Serial.print('\t');
   
   now = millis();
   t_step = now - last;
@@ -317,8 +319,10 @@ void dcPosControl(int motorInput) {
   analogWrite(dcMotorPin1, 127 + dcSpeed);
   analogWrite(dcMotorPin2, 127 - dcSpeed);
   dcPast = dcDegree;
-//  delay(50);
+//  delay(10);
   last = millis();
+//  Serial.print("t_step: ");
+//  Serial.println(t_step);
 }
 
 //***** DC Motor Velocity Control *****//
