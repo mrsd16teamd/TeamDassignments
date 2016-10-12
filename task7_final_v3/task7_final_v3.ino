@@ -122,30 +122,6 @@ void setup() {
   tempInit = analogRead(tempPin);
 }
 
-
-//***** Button press interrupt stuff
-void buttonPress() {
-  bounce = check_bounce(); //debouncing
-  if (!bounce) {
-    motorUsing = ((motorUsing + 1) % numMotors) % 32767;
-    Serial.print("State change to ");
-    Serial.println(motorUsing);
-  }
-}
-bool check_bounce()  // For button
-//Returns true if the button rising is a bounce, false if it was actually pressed.
-{
-  if ( (millis() - lastDebounceTime) > debounceDelay) {
-    if ( (lastRead == 0) && digitalRead(button) == 1 ) { //only do this for rising
-      lastDebounceTime = millis();
-      return false;
-    }
-  }
-  else {
-    return true;
-  }
-}
-
 //***** Read from pot. ******
 int potRead() {       
   int potValue = alpha * analogRead(potPin) + (1 - alpha) * potPast; // low pass filter
@@ -349,6 +325,11 @@ void dcVelControl(int motorInput) {
 
 void loop() {
 
+  Serial.print(sensorUsing);
+  Serial.print(" ");
+  Serial.print(motorUsing);
+  Serial.print(" ");
+  
   btn1 = digitalRead(button);
   if (btn1 != last_btn1) {
     if (btn1) {
@@ -407,17 +388,21 @@ void loop() {
     
     case 0:
       digitalWrite(stepper_EN, 1);
+      servo.attach(servoPin);
       servoControl(motorInput);
       break;
     case 1:
-      stepperControl(motorInput);
+      servo.detach();
       digitalWrite(stepper_EN, 0); //Enable stepper
+      stepperControl(motorInput);
       break;
     case 2:
+      servo.detach();
       digitalWrite(stepper_EN, 1);
       dcPosControl(motorInput);
       break;
     case 3:
+      servo.detach();
       digitalWrite(stepper_EN, 1);
       dcVelControl(motorInput);
       break;
