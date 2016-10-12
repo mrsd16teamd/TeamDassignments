@@ -213,7 +213,7 @@ void servoControl(int motorInput) {
 //  analogWrite(dcMotorPin1, 0);
 //  analogWrite(dcMotorPin2, 0);
 
-  servoPos = map(motorInput, 0, 1023, 0, 180);
+  servoPos = map(motorInput, 0, 1023, 5 , 175);
 //  Serial.println(servoPos);
   servo.write(servoPos);
 //  servo.writeMicroseconds(servoPos);
