@@ -15,7 +15,7 @@
 /*
    Initialize variables, pins
 */
-
+String outputStr;
 //***** Sensors *****
 #define button 4
 bool btn1;
@@ -32,7 +32,9 @@ unsigned long lastReadDelay = 200;
 #define potPin A5
 int potPast;
 
-#define irPin A4
+#define irPin A3
+int ir_reading[255]; 
+int ir_arraySize = 21;
 
 #define tempPin A2
 const float alpha = 0.5; //for low pass filter
@@ -128,8 +130,10 @@ int potRead() {
   potPast = potValue;
   float angle = (float)potValue / 1023 * 360; //[degrees]
   delay(20);
-  Serial.print(potValue);
-  Serial.println();
+
+  outputStr += String(potValue);
+//  Serial.print(potValue);
+//  Serial.println();
 //  Serial.print('\t');
   return potValue;
 }
@@ -137,32 +141,43 @@ int potRead() {
 int irRead() {          //***** Read IR sensor *****
 //  int irValue = analogRead(irPin); //[cm]
 //  float irDist = (6762 / (irValue - 9)) - 4;
-//  if (irDist > 80 || irDist < 10)
-//    irDist = -1;
-
-  for(int i = 0; i < arraySize; i++)
+//  irDist = int(irDist);
+  
+  for(int i = 0; i < ir_arraySize; i++)
   {                                                    //array pointers go from 0 to 4
 
-    reading[i] = analogRead(irPin);
+    ir_reading[i] = analogRead(irPin);
+    
+    if (ir_reading[i] < 70) {
+      ir_reading[i] = 70;
+    }
 
-//    delay(50);  //wait between analog samples
+//    delay(20);  //wait between analog samples
    } 
     //  sort the values in the array by ascending order
-    for (int i=0; i< arraySize-1; i++){
-      for (int j=i+1; j< arraySize; j++){
-        if (reading[i] > reading[j]){
-          int w = reading[i];
-          reading[i] = reading[j];
-          reading[j] = w;
+    for (int i=0; i< ir_arraySize-1; i++){
+      for (int j=i+1; j< ir_arraySize; j++){
+        if (ir_reading[i] > ir_reading[j]){
+          int w = ir_reading[i];
+          ir_reading[i] = ir_reading[j];
+          ir_reading[j] = w;
         }
       }
      }
 
-  int midpoint = arraySize/2;    //midpoint of the array is the medain value in a sorted array
-  int irValue = reading[midpoint];
+  int midpoint = ir_arraySize/2;    //midpoint of the array is the medain value in a sorted array
+  int irValue = ir_reading[midpoint];
   
-  Serial.println(irValue);
-  return irValue;
+  float irDist = (6762 / (irValue - 9)) - 4;
+  irDist = int(irDist);
+  
+
+
+  delay(20);  //wait between analog samples
+  
+//  Serial.println(irValue);
+  outputStr += String(irValue);
+  return irDist;
 }
 
 //***** Read temperature *****
@@ -172,7 +187,8 @@ int tempRead() {
   float tempRead = (voltage * 1000 - 500) / 10;
   //digital low pass filter
   float temp =  alpha * tempRead + (1 - alpha) * temp; //[celsius]
-  Serial.println(tempValue);
+//  Serial.println(tempValue);
+  outputStr += String(tempValue);
   return tempRead;
   
 }
@@ -203,7 +219,8 @@ int sonarRead() {
    int midpoint = arraySize/2;    //midpoint of the array is the medain value in a sorted array
    sonarDist = reading[midpoint];
   int sonarValue = sonarDist * 2;
-  Serial.println(sonarValue); 
+  outputStr += String(sonarValue);
+//  Serial.println(sonarValue); 
   return sonarDist;
 }
 
@@ -325,10 +342,10 @@ void dcVelControl(int motorInput) {
 
 void loop() {
 
-  Serial.print(sensorUsing);
-  Serial.print(" ");
-  Serial.print(motorUsing);
-  Serial.print(" ");
+  outputStr += String(sensorUsing);
+  outputStr += " ";
+  outputStr += String(motorUsing);
+  outputStr += " ";
   
   btn1 = digitalRead(button);
   if (btn1 != last_btn1) {
@@ -364,13 +381,34 @@ void loop() {
     case 0:
       motorInput = potRead();
       break;
+    
     case 1:
       motorInput = irRead();
-      break;
-    case 2:
-      motorInput = map(sonarRead(),6,150,0,1023);
+      if (motorInput < 10) {
+        motorInput = 10;
+      }
+
+      else if (motorInput >80) {
+        motorInput = 80;
+      }
       
+      motorInput = map(motorInput,10,80,0,1023);
       break;
+    
+    case 2:
+      motorInput = sonarRead();
+      if (motorInput > 40){
+        motorInput = 40;
+        
+      }
+      else if (motorInput < 5) {
+        motorInput = 5;
+        
+      }
+
+      motorInput = map(motorInput,5,40,0,1023);
+      break;
+    
     case 3:
       motorInput = tempRead();
       break;
@@ -410,6 +448,7 @@ void loop() {
       Serial.println("Invalid input!");
   }
   
-
+  Serial.println(outputStr);
+  outputStr = "";
 }
 
