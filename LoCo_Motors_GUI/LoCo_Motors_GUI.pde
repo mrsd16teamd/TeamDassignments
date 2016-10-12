@@ -18,6 +18,7 @@ String text = "";
 String which_motor = "**Current Motor: Servo\n";
 String which_sensor = "**Current Sensor: Pot\n";
 int sensorUsing = 0;
+int motorUsing = 0;
 String sensorPrompt = "***-:Angle: ";
 String Unit = " degree";
 float realSensorVal = 0.0;
@@ -30,7 +31,7 @@ Button stepper, dc_pos, dc_vel, servo;
 Button sensor1, sensor2, sensor3, sensor0;
 
 void setup() {
-  size(1000, 600);
+  size(960, 600);
   smooth();
   printArray(Serial.list());
  
@@ -150,13 +151,54 @@ void setup() {
                   
   text = "Please Select Serial Port.";
   sout = "**********Serial output from Arduino**********\n";
+  
+  frameRate(30);
 }
 
 void draw() {
+  
+  
   background(192);
   prompt.setText(text);
   if(firstContact==true) {
-    prompt.setText(text+"\n"+which_motor+which_sensor+"***-:Sensor Value: " + sensor_value + "\n" + sensorPrompt + realSensorVal + Unit);
+    switch(sensorUsing) {
+      case 0:
+        which_sensor = "**Current Sensor: Pot\n";
+        sensorPrompt = "***-: Angle: ";
+        Unit = " degree";
+        break;
+      case 1:
+        which_sensor = "**Current Sensor: IR\n";
+        sensorPrompt = "***-: IR Distance: ";
+        Unit = " cm";
+        break;
+      case 2:
+        which_sensor = "**Current Sensor: Sonar\n";
+        sensorPrompt = "***-: Sonar Distance: ";
+        Unit = " in";
+        break;
+      case 3:
+        which_sensor = "**Current Sensor: temp\n";
+        sensorPrompt = "***-: Temperture: ";
+        Unit = " degree Celcius";
+        break;
+    }
+    
+    switch(motorUsing) {
+      case 0:
+        which_motor = "**Current Motor: Servo\n";
+        break;
+      case 1:
+        which_motor = "**Current Motor: Stepper\n";
+        break;
+      case 2:
+        which_motor = "**Current Motor: DC Motor (Position)\n";
+        break;
+      case 3:
+        which_motor = "**Current Motor: DC Motor (Velocity)\n";
+        break;
+    }
+    prompt.setText(text+"\n"+which_motor+which_sensor+"***-:Sensor Value: " + sensor_value + "\n" + sensorPrompt + nfc(realSensorVal,3) +"\t" +Unit);
   }
   serial_window.setText(sout);
   
@@ -180,8 +222,10 @@ void serialEvent(Serial myPort) {
       ;
     } else {
       sout = sout + arduinoResponse;
-      String[] splitted = split(arduinoResponse, '\r');
-      sensor_value = int(splitted[0]);
+      String[] splitted = split(arduinoResponse, ' ');
+      sensorUsing = int(splitted[0]);
+      motorUsing = int(splitted[1]);
+      sensor_value = int(split(splitted[2], '\r')[0]);
       println(sensor_value);
       switch(sensorUsing) {
         case 0:
@@ -191,7 +235,7 @@ void serialEvent(Serial myPort) {
           realSensorVal = (6762/(sensor_value-9))-4;
           if(realSensorVal > 80 || realSensorVal < 10) {
             realSensorVal = -1;
-          }  
+          }
           break;
         case 2:
           realSensorVal = sensor_value/2;
@@ -230,7 +274,7 @@ void controlEvent(ControlEvent theEvent) {
       portName = Serial.list()[portNum];
       
       try {
-        myPort = new Serial(this, portName, 9600);
+        myPort = new Serial(this, portName, 57600);
         myPort.bufferUntil('\n');
         text = "Waiting for connection with Arduino.\n";
       } catch(RuntimeException e) {
@@ -238,40 +282,20 @@ void controlEvent(ControlEvent theEvent) {
         firstContact = false;
       }
     } else if (theEvent.getController().getName()=="stepper" && firstContact==true) {
-      which_motor = "**Current Motor: Stepper\n";
       myPort.write("m1");
     } else if (theEvent.getController().getName()=="dc_pos" && firstContact==true) {
-      which_motor = "**Current Motor: DC Motor (Position)\n";
       myPort.write("m2");
     } else if (theEvent.getController().getName()=="dc_vel" && firstContact==true) {
-      which_motor = "**Current Motor: DC Motor (Velocity)\n";
       myPort.write("m3");
     } else if (theEvent.getController().getName()=="servo" && firstContact==true) {
-      which_motor = "**Current Motor: Servo\n";
       myPort.write("m0");
     } else if (theEvent.getController().getName()=="IR" && firstContact==true) {
-      which_sensor = "**Current Sensor: IR\n";
-      sensorUsing = 1;
-      sensorPrompt = "***-: IR Distance: ";
-      Unit = " cm";
       myPort.write("s1");
     } else if (theEvent.getController().getName()=="sonar" && firstContact==true) {
-      sensorUsing = 2;
-      which_sensor = "**Current Sensor: Sonar\n";
-      sensorPrompt = "***-: Sonar Distance: ";
-      Unit = " in";
       myPort.write("s2");
     } else if (theEvent.getController().getName()=="temp" && firstContact==true) {
-      sensorUsing = 3;
-      which_sensor = "**Current Sensor: temp\n";
-      sensorPrompt = "***-:Temperture: ";
-      Unit = " degree Celcius";
       myPort.write("s3");
     } else if (theEvent.getController().getName()=="pot" && firstContact==true) {
-      sensorUsing = 0;
-      which_sensor = "**Current Sensor: Pot\n";
-      sensorPrompt = "***-:Angle: ";
-      Unit = " degree";
       myPort.write("s0");
     }
     //println(which_motor);
