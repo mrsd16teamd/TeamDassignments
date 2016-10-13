@@ -190,7 +190,8 @@ int tempRead() {
   float temp =  alpha * tempRead + (1 - alpha) * temp; //[celsius]
 //  Serial.println(tempValue);
   outputStr += String(tempValue);
-  return tempRead;
+  temp = int(temp);
+  return temp;
   
 }
 
@@ -285,7 +286,7 @@ void dcPosControl(int motorInput) {
   digitalWrite(dcMotorEnable, HIGH);
   dcEncoderRead();
   
-  int dcPosDes = map(motorInput, 0, 1023, 0, 360);
+  int dcPosDes = map(motorInput, 0, 1023, 2, 358);
 //  Serial.print("dcPositionDesired ");
 //  Serial.print(dcPosDes);
 //  Serial.print('\t');
@@ -309,7 +310,7 @@ void dcPosControl(int motorInput) {
   
   dcSpeed = int(dcSpeed);
   
-  if ((dcSpeed > -5) && (dcSpeed < 5)) {
+  if ((dcSpeed > -10) && (dcSpeed < 10)) {
     dcSpeed = 0;
   }  
   else if ((dcSpeed < 0) && (dcSpeed > -25)) {
@@ -416,7 +417,7 @@ void loop() {
     case 2:
       motorInput = sonarRead();
       if (motorInput > 40){
-        motorInput = 40;
+        motorInput = 5;
         
       }
       else if (motorInput < 5) {
@@ -424,11 +425,12 @@ void loop() {
         
       }
 
-      motorInput = map(motorInput,5,40,0,1023);
+      motorInput = map(motorInput,5,40,10,923);
       break;
     
     case 3:
-      motorInput = tempRead();
+      motorInput = int(tempRead());
+      motorInput = map(motorInput, 0, 300, 0, 1023);
       break;
     default:
       motorInput = potRead();
@@ -468,5 +470,6 @@ void loop() {
   
   Serial.println(outputStr);
   outputStr = "";
+  delay(20);
 }
 
